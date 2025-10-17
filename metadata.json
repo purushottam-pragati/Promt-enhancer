@@ -1,0 +1,5 @@
+{
+  "name": "AI Prompt Enhancement Tool",
+  "description": "A tool to systematically improve any given prompt for large language models (LLMs) by enhancing clarity, specificity, and structure, resulting in higher-quality AI responses.",
+  "requestFramePermissions": []
+}
