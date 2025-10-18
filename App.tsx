@@ -2,9 +2,9 @@ import React, { useState, useCallback, useRef } from 'react';
 import { PromptInput } from './components/PromptInput';
 import { ResultDisplay } from './components/ResultDisplay';
 import { Examples } from './components/Examples';
-import { enhancePrompt as enhancePromptApi, generateClarificationQuestions } from './services/geminiService';
+import { enhancePrompt as enhancePromptApi, generateClarificationQuestions, autoCorrectPrompt } from './services/geminiService';
 import type { EnhancedPromptResponse, Question } from './types';
-import { EnhanceIcon, ProIcon } from './components/Icons';
+import { EnhanceIcon, BrainCircuitIcon } from './components/Icons';
 import { examplesData } from './data/examples';
 import { ToggleSwitch } from './components/ToggleSwitch';
 
@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [isProMode, setIsProMode] = useState<boolean>(false);
+  const [isGuidedMode, setIsGuidedMode] = useState<boolean>(false);
   const [questions, setQuestions] = useState<Question[] | null>(null);
   
   const resultRef = useRef<HTMLDivElement>(null);
@@ -33,7 +33,6 @@ const App: React.FC = () => {
       setError("Please enter a prompt to enhance.");
       return;
     }
-    // Reset everything except the original prompt in the input box
     setError(null);
     setEnhancedResult(null);
     setQuestions(null);
@@ -43,15 +42,19 @@ const App: React.FC = () => {
     if (window.innerWidth < 1024 && resultRef.current) {
         resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    
+    // --- Babel Engine Module 1: Auto-Correction ---
+    setLoadingMessage("Cleaning up prompt...");
+    const correctedPrompt = await autoCorrectPrompt(promptToEnhance);
 
-    if (isProMode) {
-      setLoadingMessage("AI is analyzing your prompt and generating clarifying questions...");
+    if (isGuidedMode) {
+      // --- Babel Engine Module 2: Interactive Clarification ---
+      setLoadingMessage("Analyzing prompt for ambiguities...");
       try {
-        const generatedQuestions = await generateClarificationQuestions(promptToEnhance);
+        const generatedQuestions = await generateClarificationQuestions(correctedPrompt);
         if (generatedQuestions.length === 0) {
-          // If the AI needs no clarification, just enhance it directly.
           setLoadingMessage("No clarifications needed. Proceeding to enhance...");
-          const result = await enhancePromptApi(promptToEnhance);
+          const result = await enhancePromptApi(correctedPrompt);
           setEnhancedResult(result);
         } else {
           setQuestions(generatedQuestions.map((q, index) => ({ ...q, id: index })));
@@ -63,9 +66,10 @@ const App: React.FC = () => {
         setLoadingMessage('');
       }
     } else {
+      // --- Direct Enhancement Flow ---
       setLoadingMessage("Our AI is working its magic to enhance your prompt...");
       try {
-        const result = await enhancePromptApi(promptToEnhance);
+        const result = await enhancePromptApi(correctedPrompt);
         setEnhancedResult(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred.");
@@ -74,25 +78,27 @@ const App: React.FC = () => {
         setLoadingMessage('');
       }
     }
-  }, [isProMode]);
+  }, [isGuidedMode]);
 
   const handleQuestionnaireSubmit = async (answeredQuestions: Question[]) => {
       setIsLoading(true);
       setLoadingMessage("Synthesizing your answers and crafting the final prompt...");
-      setQuestions(null); // Hide questionnaire while processing
+      setQuestions(null);
       
-      // Create a detailed brief from the user's input and answers.
-      // This brief will be the input for our standard prompt enhancer.
       let detailedBrief = `Base Prompt Idea: "${originalPrompt}"\n\nKey Details & Specifications provided by the user:\n`;
+      const clarifications: string[] = [];
       answeredQuestions.forEach(q => {
-          // Format as a clear key-value pair for the AI
-          detailedBrief += `*   **${q.question.replace('?', '')}:** ${q.answer}\n`;
+          const answerText = `**${q.question.replace('?', '')}:** ${q.answer}`;
+          detailedBrief += `*   ${answerText}\n`;
+          clarifications.push(`Clarified "${q.question}" with the answer: "${q.answer}"`);
       });
 
       try {
-          // Pass this rich, detailed brief to the same enhancer used in regular mode.
-          // The enhancer AI is tasked with turning this brief into a fully structured prompt.
           const result = await enhancePromptApi(detailedBrief);
+          // Manually add clarifications to the log for the transparency module
+          if (result.enhancementLog) {
+            result.enhancementLog.clarifications = clarifications;
+          }
           setEnhancedResult(result);
       } catch (err) {
           setError(err instanceof Error ? err.message : "An error occurred while generating the final prompt.");
@@ -108,7 +114,7 @@ const App: React.FC = () => {
     handleEnhance(prompt);
   };
   
-  const isQuestionnaireActive = isProMode && questions && questions.length > 0;
+  const isQuestionnaireActive = isGuidedMode && questions && questions.length > 0;
 
   return (
     <div className="min-h-screen bg-base-100 font-sans p-4 sm:p-6 lg:p-8 relative overflow-hidden">
@@ -126,11 +132,11 @@ const App: React.FC = () => {
             </div>
             <div className="sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 mt-4 sm:mt-0">
                <ToggleSwitch
-                  label="Pro Mode"
-                  Icon={ProIcon}
-                  enabled={isProMode}
+                  label="Guided Enhancement"
+                  Icon={BrainCircuitIcon}
+                  enabled={isGuidedMode}
                   setEnabled={() => {
-                    setIsProMode(!isProMode);
+                    setIsGuidedMode(!isGuidedMode);
                     resetState();
                   }}
                 />
@@ -145,7 +151,7 @@ const App: React.FC = () => {
                 onEnhance={() => handleEnhance(originalPrompt)}
                 isLoading={isLoading}
                 isQuestionnaireActive={isQuestionnaireActive}
-                isProMode={isProMode}
+                isGuidedMode={isGuidedMode}
               />
               <div ref={resultRef}>
                   <ResultDisplay
@@ -153,13 +159,14 @@ const App: React.FC = () => {
                       isLoading={isLoading}
                       loadingMessage={loadingMessage}
                       error={error}
-                      isProMode={isProMode}
+                      isGuidedMode={isGuidedMode}
                       questions={questions}
                       onQuestionnaireSubmit={handleQuestionnaireSubmit}
+                      originalPrompt={originalPrompt}
                   />
               </div>
             </div>
-            {!isProMode && <Examples examples={examplesData} onSelectExample={handleSelectExample} />}
+            {!isGuidedMode && <Examples examples={examplesData} onSelectExample={handleSelectExample} />}
           </main>
       </div>
     </div>

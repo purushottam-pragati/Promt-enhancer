@@ -1,7 +1,26 @@
+export interface PromptVariant {
+  variantTitle: string;
+  variantDescription: string;
+  enhancedPrompt: string;
+}
+
+export interface StrategicVariants {
+  directorsCut: PromptVariant;
+  maverick: PromptVariant;
+  catalyst: PromptVariant;
+}
+
+export interface EnhancementLog {
+  userInput: string;
+  autoCorrectedInput?: string;
+  clarifications?: string[];
+  addedDetails?: string[];
+}
 
 export interface EnhancedPromptResponse {
-  title: string;
-  enhancedPrompt: string;
+  overallTitle: string;
+  variants: StrategicVariants;
+  enhancementLog: EnhancementLog;
 }
 
 export interface Example {
@@ -15,4 +34,10 @@ export interface Question {
   type: 'text' | 'select';
   suggestions?: string[];
   answer?: string;
+}
+
+export interface PromptFeedback {
+  overallRating: 'Poor' | 'Average' | 'Good';
+  strengths: string[];
+  suggestions: string[];
 }

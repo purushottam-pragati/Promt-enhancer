@@ -15,7 +15,7 @@ export const Examples: React.FC<ExamplesProps> = ({ examples, onSelectExample })
         {examples.map((example, index) => (
           <div key={index} className="bg-base-200/50 backdrop-blur-xl rounded-2xl border border-base-300/30 shadow-2xl shadow-black/20 p-6 flex flex-col justify-between group transition-all duration-300 hover:border-brand-secondary/50 hover:-translate-y-1">
             <div>
-              <h3 className="text-lg font-bold text-brand-secondary mb-2 group-hover:text-purple-400 transition-colors">{example.enhancedPromptResponse.title}</h3>
+              <h3 className="text-lg font-bold text-brand-secondary mb-2 group-hover:text-purple-400 transition-colors">{example.enhancedPromptResponse.overallTitle}</h3>
               <p className="text-text-secondary text-sm mb-4 line-clamp-3">
                 <span className="font-semibold text-text-primary">Original:</span> "{example.originalPrompt}"
               </p>
